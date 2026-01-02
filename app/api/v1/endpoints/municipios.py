@@ -79,7 +79,8 @@ def get_municipio(
     service: MunicipioService = Depends(get_municipio_service)
 ):
     """
-    Obtiene un municipio por su código DIVIPOLA.
+    Obtiene un municipio por su código DIVIPOLA. 
+    Zomac: Municipio que pertenece a la zona metropolitana de Bogotá.
     
     - **cod_mpio**: Código del municipio (ej: 05001 para Medellín)
     """
