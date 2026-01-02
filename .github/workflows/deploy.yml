@@ -13,15 +13,17 @@ jobs:
       - name: Setup and validate SSH key
         run: |
           mkdir -p $HOME/.ssh
-          # Guardar la clave y limpiar espacios al inicio/final
-          echo "${{ secrets.VPS_SSH_KEY }}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' > $HOME/.ssh/vps_key
+          # Guardar la clave preservando saltos de línea correctamente
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > $HOME/.ssh/vps_key
           chmod 600 $HOME/.ssh/vps_key
           # Validar formato básico
           if ! grep -q "BEGIN.*PRIVATE KEY" $HOME/.ssh/vps_key; then
             echo "❌ Error: La clave SSH no tiene el formato correcto"
+            echo "Primeras líneas del archivo:"
+            head -3 $HOME/.ssh/vps_key
             exit 1
           fi
-          echo "✅ Clave SSH validada"
+          echo "✅ Clave SSH validada (tamaño: $(wc -c < $HOME/.ssh/vps_key) bytes)"
           echo "SSH_KEY_PATH=$HOME/.ssh/vps_key" >> $GITHUB_ENV
 
       - name: Verificar Traefik y red
@@ -30,7 +32,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key_path: ${{ env.SSH_KEY_PATH }}
-          script_timeout: 2m
+          command_timeout: 2m
           script: |
             echo "🔍 Verificando Traefik..."
             if ! docker ps | grep -q traefik; then
@@ -61,7 +63,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key_path: ${{ env.SSH_KEY_PATH }}
-          script_timeout: 10m
+          command_timeout: 10m
           script: |
             cd ~/apps/divipola-api
             git pull origin main
@@ -81,7 +83,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key_path: ${{ env.SSH_KEY_PATH }}
-          script_timeout: 5m
+          command_timeout: 5m
           script: |
             echo "⏳ Esperando 15 segundos..."
             sleep 15
