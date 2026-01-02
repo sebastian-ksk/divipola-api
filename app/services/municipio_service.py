@@ -125,6 +125,32 @@ class MunicipioService:
         """Cuenta municipios con filtros"""
         return self.repository.count(dpto=dpto, cod_dpto=cod_dpto, nom_mpio=nom_mpio)
     
+    def get_stats(
+        self,
+        dpto: Optional[str] = None,
+        cod_dpto: Optional[str] = None
+    ) -> Dict[str, int]:
+        """Obtiene estadísticas de municipios incluyendo PDET y ZOMAC"""
+        cache_key = f"stats:{dpto or ''}:{cod_dpto or ''}"
+        cached = get_cache(cache_key)
+        if cached:
+            return cached
+        
+        total = self.repository.count(dpto=dpto, cod_dpto=cod_dpto)
+        total_pdet = self.repository.count_pdet(dpto=dpto, cod_dpto=cod_dpto)
+        total_zomac = self.repository.count_zomac(dpto=dpto, cod_dpto=cod_dpto)
+        total_pdet_zomac = self.repository.count_pdet_zomac(dpto=dpto, cod_dpto=cod_dpto)
+        
+        result = {
+            "total_municipios": total,
+            "total_pdet": total_pdet,
+            "total_zomac": total_zomac,
+            "total_pdet_zomac": total_pdet_zomac
+        }
+        
+        set_cache(cache_key, result, expire=3600)
+        return result
+    
     def _municipio_to_dict(self, municipio) -> Dict[str, Any]:
         """Convierte un modelo Municipio a diccionario"""
         return {

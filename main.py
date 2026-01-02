@@ -34,19 +34,6 @@ app = FastAPI(
     description="""
     API REST para consultar información de municipios de Colombia según el código DIVIPOLA.
     
-    ## Características
-    
-    * Consulta de municipios con filtros avanzados
-    * Información de departamentos
-    * Estadísticas de municipios
-    * Cache con Redis para mejor rendimiento
-    * Actualización automática de datos semanalmente
-    
-    ## Endpoints principales
-    
-    * **Municipios**: Consulta y búsqueda de municipios
-    * **Departamentos**: Lista de departamentos de Colombia
-    * **Estadísticas**: Estadísticas y conteos de municipios
     """,
     version="1.0.0",
     contact={

@@ -1,0 +1,108 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verificar Traefik y red
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "🔍 Verificando Traefik..."
+            if ! docker ps | grep -q traefik; then
+              echo "⚠️ Traefik no está corriendo"
+            else
+              echo "✅ Traefik está corriendo"
+              echo "🔍 Verificando puertos de Traefik:"
+              docker ps | grep traefik
+              echo ""
+              echo "🔍 Verificando si Traefik escucha en puerto 80:"
+              docker ps | grep traefik | grep -E "0.0.0.0:80->" && echo "✅ Traefik está escuchando en puerto 80" || echo "❌ Traefik NO está escuchando en puerto 80"
+              echo ""
+              echo "🔍 Verificando si Traefik escucha en puerto 443:"
+              docker ps | grep traefik | grep -E "0.0.0.0:443->" && echo "✅ Traefik está escuchando en puerto 443" || echo "⚠️ Traefik no escucha en puerto 443"
+            fi
+
+            echo "🔍 Verificando red traefik_network..."
+            if ! docker network ls | grep -q traefik_network; then
+              echo "📦 Creando red traefik_network..."
+              docker network create traefik_network
+            else
+              echo "✅ Red traefik_network existe"
+            fi
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd ~/apps/divipola-api
+            git pull origin main
+            docker compose -f docker-compose.yml down
+            docker compose -f docker-compose.yml up -d --build --remove-orphans
+            docker image prune -f
+            echo "✅ Deploy completado"
+            echo "🔄 Forzando recarga de Traefik..."
+            docker restart traefik 2>/dev/null || echo "⚠️ No se pudo reiniciar Traefik (puede que no esté corriendo o tenga otro nombre)"
+            echo ""
+            echo "📋 Verificando que el contenedor está en la red traefik_network:"
+            docker inspect divipola_api --format '{{range $net, $conf := .NetworkSettings.Networks}}{{$net}} {{end}}' || echo "❌ Error al verificar red"
+
+      - name: Wait and show logs
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "⏳ Esperando 15 segundos..."
+            sleep 15
+            echo "📋 Estado del contenedor:"
+            docker ps | grep divipola_api || echo "❌ Contenedor no encontrado"
+            echo ""
+            echo "📋 Últimos logs:"
+            docker logs --tail 50 divipola_api 2>&1 || echo "❌ No se pudieron obtener logs"
+            echo ""
+            echo "🔍 Verificando conexión a Traefik:"
+            docker network inspect traefik_network --format '{{range .Containers}}{{.Name}} {{end}}' || echo "❌ Error al inspeccionar red"
+            echo ""
+            echo "📋 Logs de Traefik (últimas 20 líneas):"
+            docker logs --tail 20 traefik 2>&1 || echo "⚠️ No se pudieron obtener logs de Traefik"
+            echo ""
+            echo "🔍 Verificando si Traefik detecta divipola-api:"
+            docker logs traefik 2>&1 | grep -i "divipola" | tail -5 || echo "⚠️ No se encontraron referencias a divipola en logs de Traefik"
+            echo ""
+            echo "🔍 Probando conexión desde Traefik al contenedor:"
+            docker exec traefik wget -q -O- --timeout=2 http://divipola_api:8000/health 2>&1 | head -3 || echo "⚠️ Traefik no puede alcanzar divipola_api:8000"
+            echo ""
+            echo "🔍 Verificando routers de Traefik para divipola-api:"
+            docker exec traefik wget -q -O- http://localhost:8080/api/http/routers 2>/dev/null | grep -i "divipola" || echo "⚠️ No se encontraron routers en Traefik API"
+            echo ""
+            echo "🔍 Verificando servicios de Traefik:"
+            docker exec traefik wget -q -O- http://localhost:8080/api/http/services 2>/dev/null | grep -i "divipola" || echo "⚠️ No se encontraron servicios en Traefik API"
+            echo ""
+            echo "🔍 Verificando labels del contenedor divipola_api:"
+            docker inspect divipola_api --format '{{range .Config.Labels}}{{.}}{{"\n"}}{{end}}' | grep traefik || echo "⚠️ No se encontraron labels de Traefik"
+            echo ""
+            echo "🔍 Verificando IP del contenedor en traefik_network:"
+            docker inspect divipola_api --format '{{range $net, $conf := .NetworkSettings.Networks}}{{if eq $net "traefik_network"}}IP: {{$conf.IPAddress}}{{end}}{{end}}' || echo "⚠️ Error al obtener IP"
+            echo ""
+            echo "🔍 Verificando DNS del dominio:"
+            nslookup sebastianlabs.tech 2>/dev/null || dig sebastianlabs.tech +short 2>/dev/null || echo "⚠️ No se pudo verificar DNS"
+            echo ""
+            echo "🔍 Verificando firewall (ufw):"
+            sudo ufw status 2>/dev/null || echo "⚠️ ufw no está disponible o requiere permisos"
+            echo ""
+            echo "🔍 Verificando certificado SSL del dominio:"
+            curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" -k -m 5 https://sebastianlabs.tech/api/divipola 2>&1 || echo "⚠️ No se pudo verificar HTTPS del dominio"
+

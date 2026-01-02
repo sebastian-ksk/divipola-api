@@ -2,12 +2,11 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: divipola_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: divipola_user
       POSTGRES_PASSWORD: divipola_pass
       POSTGRES_DB: divipola_db
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -15,12 +14,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - divipola_network
 
   redis:
     image: redis:7-alpine
     container_name: divipola_redis
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
     volumes:
       - redis_data:/data
     healthcheck:
@@ -28,12 +28,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - divipola_network
 
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: divipola_api
-    ports:
-      - "8000:8000"
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://divipola_user:divipola_pass@postgres:5432/divipola_db
       REDIS_URL: redis://redis:6379/0
@@ -43,10 +46,40 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - .:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    labels:
+      - "traefik.enable=true"
+      # Router HTTP con path /api/divipola (redirige a HTTPS)
+      - "traefik.http.routers.divipola-http.rule=Host(`sebastianlabs.tech`) && PathPrefix(`/api/divipola`)"
+      - "traefik.http.routers.divipola-http.entrypoints=web"
+      - "traefik.http.routers.divipola-http.middlewares=divipola-redirect"
+      - "traefik.http.routers.divipola-http.priority=10"
+      - "traefik.http.routers.divipola-http.service=divipola"
+      # Middleware de redirección HTTP a HTTPS
+      - "traefik.http.middlewares.divipola-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.divipola-redirect.redirectscheme.permanent=true"
+      # Router HTTPS con path /api/divipola y certificado SSL automático
+      - "traefik.http.routers.divipola-https.rule=Host(`sebastianlabs.tech`) && PathPrefix(`/api/divipola`)"
+      - "traefik.http.routers.divipola-https.entrypoints=websecure"
+      - "traefik.http.routers.divipola-https.tls=true"
+      - "traefik.http.routers.divipola-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.divipola-https.priority=10"
+      - "traefik.http.routers.divipola-https.service=divipola"
+      # Middleware para quitar el prefijo /api/divipola antes de enviar a la API
+      - "traefik.http.middlewares.divipola-stripprefix.stripprefix.prefixes=/api/divipola"
+      # Aplicar middleware de strip prefix al router HTTPS
+      - "traefik.http.routers.divipola-https.middlewares=divipola-stripprefix"
+      # Service compartido para ambos routers
+      - "traefik.http.services.divipola.loadbalancer.server.port=8000"
+    networks:
+      - divipola_network
+      - traefik_network
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  divipola_network:
+    driver: bridge
+  traefik_network:
+    external: true

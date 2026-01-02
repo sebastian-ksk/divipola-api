@@ -21,6 +21,21 @@ def get_municipio_service(db: Session = Depends(get_db)) -> MunicipioService:
     return MunicipioService(db)
 
 
+@router_departamentos.get("", response_model=DepartamentosResponse)
+def list_departamentos(
+    service: MunicipioService = Depends(get_municipio_service)
+):
+    """
+    Lista todos los departamentos de Colombia.
+    
+    Retorna un objeto con:
+    - **items**: Lista única de departamentos con su código y nombre
+    - **total**: Total de departamentos en Colombia
+    """
+    departamentos = service.get_departamentos()
+    return departamentos
+
+
 @router.get("", response_model=PaginatedResponse[MunicipioResponse])
 def list_municipios(
     dpto: Optional[str] = Query(None, description="Filtrar por nombre de departamento (búsqueda parcial)"),
@@ -77,21 +92,6 @@ def get_municipio(
     return municipio
 
 
-@router_departamentos.get("", response_model=DepartamentosResponse)
-def list_departamentos(
-    service: MunicipioService = Depends(get_municipio_service)
-):
-    """
-    Lista todos los departamentos de Colombia.
-    
-    Retorna un objeto con:
-    - **items**: Lista única de departamentos con su código y nombre
-    - **total**: Total de departamentos en Colombia
-    """
-    departamentos = service.get_departamentos()
-    return departamentos
-
-
 @router_stats.get("", response_model=StatsResponse)
 def get_stats(
     dpto: Optional[str] = Query(None, description="Filtrar por nombre de departamento"),
@@ -99,13 +99,17 @@ def get_stats(
     service: MunicipioService = Depends(get_municipio_service)
 ):
     """
-    Obtiene estadísticas de municipios.
+    Obtiene estadísticas de municipios incluyendo datos de PDET y ZOMAC.
     
     - **dpto**: Filtrar por nombre de departamento
     - **cod_dpto**: Filtrar por código de departamento
     
-    Retorna el total de municipios según los filtros aplicados.
+    Retorna estadísticas con:
+    - **total_municipios**: Total de municipios según los filtros
+    - **total_pdet**: Total de municipios PDET
+    - **total_zomac**: Total de municipios ZOMAC
+    - **total_pdet_zomac**: Total de municipios que son PDET y ZOMAC
     """
-    total = service.count_municipios(dpto=dpto, cod_dpto=cod_dpto)
-    return {"total_municipios": total}
+    stats = service.get_stats(dpto=dpto, cod_dpto=cod_dpto)
+    return stats
 

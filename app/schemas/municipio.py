@@ -41,6 +41,9 @@ class DepartamentoResponse(BaseModel):
 
 class StatsResponse(BaseModel):
     total_municipios: int
+    total_pdet: int
+    total_zomac: int
+    total_pdet_zomac: int
 
 
 class DepartamentosResponse(BaseModel):

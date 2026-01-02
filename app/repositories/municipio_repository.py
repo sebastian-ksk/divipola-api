@@ -60,6 +60,54 @@ class MunicipioRepository:
         
         return query.count()
     
+    def count_pdet(
+        self,
+        dpto: Optional[str] = None,
+        cod_dpto: Optional[str] = None
+    ) -> int:
+        """Cuenta municipios PDET con filtros opcionales"""
+        query = self.db.query(Municipio).filter(Municipio.pdet == True)
+        
+        if dpto:
+            query = query.filter(func.lower(Municipio.dpto).like(f"%{dpto.lower()}%"))
+        if cod_dpto:
+            query = query.filter(Municipio.cod_dpto == cod_dpto)
+        
+        return query.count()
+    
+    def count_zomac(
+        self,
+        dpto: Optional[str] = None,
+        cod_dpto: Optional[str] = None
+    ) -> int:
+        """Cuenta municipios ZOMAC con filtros opcionales"""
+        query = self.db.query(Municipio).filter(Municipio.zomac == True)
+        
+        if dpto:
+            query = query.filter(func.lower(Municipio.dpto).like(f"%{dpto.lower()}%"))
+        if cod_dpto:
+            query = query.filter(Municipio.cod_dpto == cod_dpto)
+        
+        return query.count()
+    
+    def count_pdet_zomac(
+        self,
+        dpto: Optional[str] = None,
+        cod_dpto: Optional[str] = None
+    ) -> int:
+        """Cuenta municipios que son PDET y ZOMAC con filtros opcionales"""
+        query = self.db.query(Municipio).filter(
+            Municipio.pdet == True,
+            Municipio.zomac == True
+        )
+        
+        if dpto:
+            query = query.filter(func.lower(Municipio.dpto).like(f"%{dpto.lower()}%"))
+        if cod_dpto:
+            query = query.filter(Municipio.cod_dpto == cod_dpto)
+        
+        return query.count()
+    
     def create(self, municipio_data: dict) -> Municipio:
         """Crea un nuevo municipio"""
         municipio = Municipio(**municipio_data)
