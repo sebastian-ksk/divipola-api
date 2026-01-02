@@ -7,6 +7,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: PROD
 
     steps:
       - name: Verificar Traefik y red
@@ -105,4 +106,3 @@ jobs:
             echo ""
             echo "🔍 Verificando certificado SSL del dominio:"
             curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" -k -m 5 https://sebastianlabs.tech/api/divipola 2>&1 || echo "⚠️ No se pudo verificar HTTPS del dominio"
-
