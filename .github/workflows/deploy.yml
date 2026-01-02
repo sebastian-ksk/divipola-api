@@ -65,17 +65,53 @@ jobs:
           key_path: ${{ env.SSH_KEY_PATH }}
           command_timeout: 10m
           script: |
-            cd ~/apps/divipola-api
-            git pull origin main
-            docker compose -f docker-compose.yml down
+            # Crear directorio si no existe
+            mkdir -p ~/apps
+
+            # Clonar o actualizar repositorio
+            if [ ! -d ~/apps/divipola-api ]; then
+              echo "📦 Clonando repositorio..."
+              cd ~/apps
+              git clone https://github.com/sebastian-ksk/divipola-api.git
+              cd divipola-api
+            else
+              echo "🔄 Actualizando repositorio..."
+              cd ~/apps/divipola-api
+              git fetch origin
+              git reset --hard origin/main
+            fi
+
+            # Verificar que docker-compose.yml existe
+            if [ ! -f docker-compose.yml ]; then
+              echo "❌ Error: docker-compose.yml no encontrado"
+              exit 1
+            fi
+
+            # Crear .env si no existe
+            if [ ! -f .env ]; then
+              echo "📝 Creando archivo .env..."
+              echo "DATOS_GOV_APP_TOKEN=" > .env
+              echo "⚠️ IMPORTANTE: Configura DATOS_GOV_APP_TOKEN en el archivo .env"
+            else
+              echo "✅ Archivo .env existe"
+            fi
+
+            # Detener contenedores existentes
+            docker compose -f docker-compose.yml down 2>/dev/null || true
+
+            # Construir y levantar contenedores
+            echo "🔨 Construyendo y levantando contenedores..."
             docker compose -f docker-compose.yml up -d --build --remove-orphans
+
+            # Limpiar imágenes sin usar
             docker image prune -f
+
             echo "✅ Deploy completado"
             echo "🔄 Forzando recarga de Traefik..."
-            docker restart traefik 2>/dev/null || echo "⚠️ No se pudo reiniciar Traefik (puede que no esté corriendo o tenga otro nombre)"
+            docker restart traefik 2>/dev/null || echo "⚠️ No se pudo reiniciar Traefik"
             echo ""
             echo "📋 Verificando que el contenedor está en la red traefik_network:"
-            docker inspect divipola_api --format '{{range $net, $conf := .NetworkSettings.Networks}}{{$net}} {{end}}' || echo "❌ Error al verificar red"
+            docker inspect divipola_api --format '{{range $net, $conf := .NetworkSettings.Networks}}{{$net}} {{end}}' 2>/dev/null || echo "⚠️ Contenedor aún no está disponible"
 
       - name: Wait and show logs
         uses: appleboy/ssh-action@master
