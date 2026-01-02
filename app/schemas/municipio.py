@@ -1,5 +1,7 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, TypeVar, Generic
+
+T = TypeVar('T')
 
 
 class MunicipioBase(BaseModel):
@@ -39,4 +41,21 @@ class DepartamentoResponse(BaseModel):
 
 class StatsResponse(BaseModel):
     total_municipios: int
+
+
+class DepartamentosResponse(BaseModel):
+    """Respuesta con lista de departamentos y total"""
+    items: List[DepartamentoResponse]
+    total: int
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """Respuesta paginada genérica"""
+    items: List[T]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+    has_next: bool
+    has_previous: bool
 

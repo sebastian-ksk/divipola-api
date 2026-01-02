@@ -37,6 +37,7 @@ services:
     environment:
       DATABASE_URL: postgresql://divipola_user:divipola_pass@postgres:5432/divipola_db
       REDIS_URL: redis://redis:6379/0
+      DATOS_GOV_APP_TOKEN: ${DATOS_GOV_APP_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy

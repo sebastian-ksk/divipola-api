@@ -2,13 +2,21 @@ from app.schemas.municipio import (
     MunicipioBase,
     MunicipioCreate,
     MunicipioResponse,
-    MunicipioFilter
+    MunicipioFilter,
+    DepartamentoResponse,
+    DepartamentosResponse,
+    StatsResponse,
+    PaginatedResponse
 )
 
 __all__ = [
     "MunicipioBase",
     "MunicipioCreate",
     "MunicipioResponse",
-    "MunicipioFilter"
+    "MunicipioFilter",
+    "DepartamentoResponse",
+    "DepartamentosResponse",
+    "StatsResponse",
+    "PaginatedResponse"
 ]
 

@@ -12,4 +12,5 @@ ENV/
 *.sqlite
 .DS_Store
 *.log
+docker-compose.dev.yml
 

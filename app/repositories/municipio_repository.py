@@ -35,23 +35,29 @@ class MunicipioRepository:
         return query.offset(skip).limit(limit).all()
     
     def get_departamentos(self) -> List[tuple]:
-        """Obtiene todos los departamentos únicos"""
+        """Obtiene todos los departamentos únicos ordenados por código"""
+        # Usar group_by para obtener departamentos únicos correctamente
         return self.db.query(
             Municipio.cod_dpto,
             Municipio.dpto
-        ).distinct().order_by(Municipio.dpto).all()
+        ).group_by(Municipio.cod_dpto, Municipio.dpto).order_by(Municipio.cod_dpto).all()
     
     def count(
         self,
         dpto: Optional[str] = None,
-        cod_dpto: Optional[str] = None
+        cod_dpto: Optional[str] = None,
+        nom_mpio: Optional[str] = None
     ) -> int:
         """Cuenta municipios con filtros opcionales"""
         query = self.db.query(Municipio)
+        
         if dpto:
             query = query.filter(func.lower(Municipio.dpto).like(f"%{dpto.lower()}%"))
         if cod_dpto:
             query = query.filter(Municipio.cod_dpto == cod_dpto)
+        if nom_mpio:
+            query = query.filter(func.lower(Municipio.nom_mpio).like(f"%{nom_mpio.lower()}%"))
+        
         return query.count()
     
     def create(self, municipio_data: dict) -> Municipio:
@@ -62,10 +68,10 @@ class MunicipioRepository:
         self.db.refresh(municipio)
         return municipio
     
-    def update(self, municipio: Municipio, municipio_data: dict) -> Municipio:
+    def update(self, municipio: Municipio, municipio_data: dict, update_zomac_pdet: bool = False) -> Municipio:
         """Actualiza un municipio existente"""
         for key, value in municipio_data.items():
-            if key not in ["pdet", "zomac"]:  # No sobrescribir pdet y zomac
+            if update_zomac_pdet or key not in ["pdet", "zomac"]:
                 setattr(municipio, key, value)
         self.db.commit()
         self.db.refresh(municipio)

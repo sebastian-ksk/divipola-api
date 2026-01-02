@@ -5,7 +5,9 @@ from app.core.database import get_db
 from app.schemas.municipio import (
     MunicipioResponse,
     DepartamentoResponse,
-    StatsResponse
+    StatsResponse,
+    PaginatedResponse,
+    DepartamentosResponse
 )
 from app.services.municipio_service import MunicipioService
 
@@ -19,32 +21,41 @@ def get_municipio_service(db: Session = Depends(get_db)) -> MunicipioService:
     return MunicipioService(db)
 
 
-@router.get("", response_model=List[MunicipioResponse])
+@router.get("", response_model=PaginatedResponse[MunicipioResponse])
 def list_municipios(
     dpto: Optional[str] = Query(None, description="Filtrar por nombre de departamento (búsqueda parcial)"),
     cod_dpto: Optional[str] = Query(None, description="Filtrar por código de departamento"),
     nom_mpio: Optional[str] = Query(None, description="Filtrar por nombre de municipio (búsqueda parcial)"),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    page: int = Query(1, ge=1, description="Número de página (empezando en 1)"),
+    limit: int = Query(100, ge=1, le=1000, description="Número de registros por página (máximo 1000)"),
     service: MunicipioService = Depends(get_municipio_service)
 ):
     """
-    Lista todos los municipios con filtros opcionales.
+    Lista todos los municipios con filtros opcionales y paginación.
     
     - **dpto**: Búsqueda parcial por nombre de departamento
     - **cod_dpto**: Filtro exacto por código de departamento
     - **nom_mpio**: Búsqueda parcial por nombre de municipio
-    - **skip**: Número de registros a saltar (paginación)
-    - **limit**: Número máximo de registros a retornar (máximo 1000)
+    - **page**: Número de página (empezando en 1)
+    - **limit**: Número máximo de registros por página (máximo 1000)
+    
+    Retorna un objeto paginado con:
+    - **items**: Lista de municipios
+    - **total**: Total de registros que cumplen los filtros
+    - **page**: Página actual
+    - **limit**: Límite de registros por página
+    - **total_pages**: Total de páginas
+    - **has_next**: Indica si existe una página siguiente
+    - **has_previous**: Indica si existe una página anterior
     """
-    municipios = service.get_municipios(
+    result = service.get_municipios(
         dpto=dpto,
         cod_dpto=cod_dpto,
         nom_mpio=nom_mpio,
-        skip=skip,
+        page=page,
         limit=limit
     )
-    return municipios
+    return result
 
 
 @router.get("/{cod_mpio}", response_model=MunicipioResponse)
@@ -66,14 +77,16 @@ def get_municipio(
     return municipio
 
 
-@router_departamentos.get("", response_model=List[DepartamentoResponse])
+@router_departamentos.get("", response_model=DepartamentosResponse)
 def list_departamentos(
     service: MunicipioService = Depends(get_municipio_service)
 ):
     """
     Lista todos los departamentos de Colombia.
     
-    Retorna una lista única de departamentos con su código y nombre.
+    Retorna un objeto con:
+    - **items**: Lista única de departamentos con su código y nombre
+    - **total**: Total de departamentos en Colombia
     """
     departamentos = service.get_departamentos()
     return departamentos

@@ -53,6 +53,19 @@ docker-compose -f docker-compose.dev.yml down
    docker-compose -f docker-compose.dev.yml logs -f api
    ```
 
+## 🔑 Configuración de App Token
+
+Para obtener mejores límites de la API de Datos Abiertos Colombia:
+
+1. Regístrate en: https://www.datos.gov.co/profile/app_tokens
+2. Crea un App Token
+3. Agrega la variable de entorno en tu `.env`:
+   ```env
+   DATOS_GOV_APP_TOKEN=tu_app_token_aqui
+   ```
+
+**Nota:** Sin el token, la API funciona pero con límites reducidos de throttling.
+
 ## 🔧 Comandos Útiles
 
 ### Reconstruir imagen después de cambios en requirements.txt

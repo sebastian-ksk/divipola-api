@@ -4,6 +4,7 @@ from app.repositories.municipio_repository import MunicipioRepository
 from app.core.redis_client import get_cache, set_cache
 from app.schemas.municipio import MunicipioResponse, DepartamentoResponse
 import hashlib
+import math
 
 
 class MunicipioService:
@@ -33,16 +34,23 @@ class MunicipioService:
         dpto: Optional[str] = None,
         cod_dpto: Optional[str] = None,
         nom_mpio: Optional[str] = None,
-        skip: int = 0,
+        page: int = 1,
         limit: int = 100
-    ) -> List[Dict[str, Any]]:
-        """Obtiene municipios con filtros y cache"""
+    ) -> Dict[str, Any]:
+        """Obtiene municipios con filtros, paginación y cache"""
+        # Validar página
+        if page < 1:
+            page = 1
+        
+        # Calcular skip
+        skip = (page - 1) * limit
+        
         # Crear clave de cache basada en los filtros
         filter_params = {
             "dpto": dpto,
             "cod_dpto": cod_dpto,
             "nom_mpio": nom_mpio,
-            "skip": skip,
+            "page": page,
             "limit": limit
         }
         cache_key = f"municipios:{hashlib.md5(str(filter_params).encode()).hexdigest()}"
@@ -51,6 +59,14 @@ class MunicipioService:
         if cached:
             return cached
         
+        # Obtener total de registros con los mismos filtros
+        total = self.repository.count(
+            dpto=dpto,
+            cod_dpto=cod_dpto,
+            nom_mpio=nom_mpio
+        )
+        
+        # Obtener municipios
         municipios = self.repository.get_all(
             dpto=dpto,
             cod_dpto=cod_dpto,
@@ -59,29 +75,55 @@ class MunicipioService:
             limit=limit
         )
         
-        result = [self._municipio_to_dict(m) for m in municipios]
+        # Calcular información de paginación
+        total_pages = math.ceil(total / limit) if total > 0 else 0
+        has_next = page < total_pages
+        has_previous = page > 1
+        
+        items = [self._municipio_to_dict(m) for m in municipios]
+        
+        result = {
+            "items": items,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+            "has_next": has_next,
+            "has_previous": has_previous
+        }
+        
         set_cache(cache_key, result)
         return result
     
-    def get_departamentos(self) -> List[Dict[str, str]]:
-        """Obtiene todos los departamentos con cache"""
+    def get_departamentos(self) -> Dict[str, Any]:
+        """Obtiene todos los departamentos con cache y total"""
         cache_key = "departamentos:all"
         cached = get_cache(cache_key)
-        if cached:
+        
+        # Si el cache existe y tiene el formato nuevo, retornarlo
+        if cached and isinstance(cached, dict) and "items" in cached and "total" in cached:
             return cached
         
+        # Si el cache tiene formato antiguo o no existe, obtener datos frescos
         departamentos = self.repository.get_departamentos()
-        result = [{"cod_dpto": d.cod_dpto, "dpto": d.dpto} for d in departamentos]
+        items = [{"cod_dpto": d.cod_dpto, "dpto": d.dpto} for d in departamentos]
+        total = len(items)
+        
+        result = {
+            "items": items,
+            "total": total
+        }
         set_cache(cache_key, result, expire=7200)
         return result
     
     def count_municipios(
         self,
         dpto: Optional[str] = None,
-        cod_dpto: Optional[str] = None
+        cod_dpto: Optional[str] = None,
+        nom_mpio: Optional[str] = None
     ) -> int:
         """Cuenta municipios con filtros"""
-        return self.repository.count(dpto=dpto, cod_dpto=cod_dpto)
+        return self.repository.count(dpto=dpto, cod_dpto=cod_dpto, nom_mpio=nom_mpio)
     
     def _municipio_to_dict(self, municipio) -> Dict[str, Any]:
         """Convierte un modelo Municipio a diccionario"""
